@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use noise::{NoiseFn, Perlin};
+use rand::{thread_rng, Rng};
 
 pub struct TileMapPlugin;
 
@@ -27,7 +28,8 @@ struct Tile {
 
 impl Plugin for TileMapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_startup_system(spawn_map);
+        app.add_startup_system(spawn_map)
+            .add_system(respawn_map);
     }
 }
 
@@ -36,9 +38,9 @@ impl MapGen {
 
         let height_noise = NoiseMap {
             noise_map: Perlin::new(seed),
-            octaves: 24,
+            octaves: 8,
             scale: 250.0,
-            persistance: 0.08,
+            persistance: 0.07,
             lacunarity: 4.7,
         };
 
@@ -76,7 +78,7 @@ impl MapGen {
         let y_dis = y as f32 / (self.tile_size * self.tile_scale * self.map_size as f32 / 2.0);
 
         let mut height = 6000.0 * (self.height_noise.get_value(x, y) - 2.5 * (norm_dis.powf(2.5) + 1.0).ln()) - 2000.0;
-        let mut temp: f64 = 44.0 * (-y_dis as f64) + 10.0 + 20.0 * self.temperature_noise.get_value(x, y);
+        let mut temp: f64 = 44.0 * (-y_dis as f64) + 11.0 + 12.0 * self.temperature_noise.get_value(x, y);
 
         let mut index: usize = 0;
         let mut color = Color::rgb(1.0, 1.0, 1.0);
@@ -194,14 +196,17 @@ impl NoiseMap {
 fn spawn_map(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>
 ) {
+
     let tile_size = 16.0;
     let tile_scale = 0.5;
     let map_size = 150;
 
+    let mut rng = thread_rng();
+
     //829201
-    let mapgen = MapGen::new(2342343, map_size, tile_size, tile_scale);
+    let mapgen = MapGen::new(rng.gen_range(0..99999), map_size, tile_size, tile_scale);
 
     let texture_handle = asset_server.load("textures/tilemap.png");
     let texture_atlas =
@@ -235,5 +240,22 @@ fn spawn_map(
                 },
             ));
         }
+    }
+}
+
+fn respawn_map(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    keyboard: Res<Input<KeyCode>>,
+    query: Query<Entity>,
+) {
+    if keyboard.just_pressed(KeyCode::Space) {
+
+        for entity in query.iter() {
+            commands.entity(entity).despawn();
+        }
+
+        spawn_map(commands, asset_server, texture_atlases);
     }
 }
