@@ -17,8 +17,8 @@ struct YShift(f64);
 pub struct TileMapPlugin;
 
 // Adiabatic Lapse Rates for dry and wet air [C/m]
-const DRY_ADB_LAPSE_RATE: f64 = 9.8/2000.0;
-const WET_ADB_LAPSE_RATE: f64 = 5.0/2000.0;
+const DRY_ADB_LAPSE_RATE: f64 = 9.8/1000.0;
+const WET_ADB_LAPSE_RATE: f64 = 5.0/1000.0;
 
 // Grass biome colors
 const BOREAL_FOREST_COLOR: Color       = Color::rgb(26.0/255.0, 101.0/255.0, 49.0/255.0);
@@ -85,26 +85,26 @@ impl MapGen {
 
         let height_noise = NoiseMap {
             noise_map: Perlin::new(seed),
-            octaves: 14,
-            scale: 200.0 * zoom,
-            persistance: 0.14,
-            lacunarity: 3.7,
+            octaves: 24,
+            scale: 100.0 * zoom,
+            persistance: 0.3,
+            lacunarity: 4.7,
         };
 
         let temperature_noise = NoiseMap {
             noise_map: Perlin::new(seed),
-            octaves: 8,
-            scale: 100.0 * zoom,
-            persistance: 0.15,
-            lacunarity: 3.2,
+            octaves: 24,
+            scale: 70.0 * zoom,
+            persistance: 0.2,
+            lacunarity: 4.1,
         };
 
         let humidity_noise = NoiseMap {
             noise_map: Perlin::new(seed),
             octaves: 8,
-            scale: 100.0 * zoom,
-            persistance: 0.15,
-            lacunarity: 3.2,
+            scale: 90.0 * zoom,
+            persistance: 0.08,
+            lacunarity: 1.2,
         };
 
         Self {
@@ -120,9 +120,9 @@ impl MapGen {
         }
     }
 
-    fn pick_biome(&self, abs_elevation: f64, temperature: f64, percipitation: f64) -> Biome {
+    fn pick_biome(&self, height: f64, temperature: f64, percipitation: f64) -> Biome {
 
-        if abs_elevation == 0.0 {
+        if height <= 0.0 {
             return Biome::Ocean;
         }
 
@@ -167,6 +167,73 @@ impl MapGen {
         }
     }
 
+    fn get_heights(&self, r_dis: f64, x: f64, y: f64) -> (f64, f64) {
+        let globe_noise = self.height_noise.get_value(x, y) * (1.0 - (r_dis + 0.3 + 0.4 * self.height_noise.get_value(-x, -y)));
+        let height = 6000.0 * globe_noise - 1000.0;
+
+        let mut absl_height = height;
+        if absl_height < 0.0 {
+            absl_height = 0.0;
+        } 
+
+        (height, absl_height)
+    }
+
+    fn get_partial_temp(&self, absl_height: f64, y_dis: f64, lapse_rate: f64, x: f64, y: f64) -> f64 {
+        let noisy_temp = 20.0 * self.temperature_noise.get_value(x, y) - 5.0;
+        let temperature = -70.0 * y_dis + noisy_temp - (lapse_rate * absl_height);
+
+        temperature
+    }
+
+    fn get_percip_temp(&self, absl_height: f64, y_dis: f64, partial_temp: f64, x: f64, y: f64) -> (f64, f64) {
+        let mut temp_clamp = partial_temp;
+        if temp_clamp < 0.0 {
+            temp_clamp = 0.0;
+        }
+        if temp_clamp > 20.0 {
+            temp_clamp = 0.0;
+        }
+
+        let mut evap_prob = 1.0 - ((temp_clamp - 10.0) / 10.0).abs();
+        if evap_prob < 0.0 {
+            evap_prob = 0.0;
+        }
+
+        let avg_lapse_rate = ((WET_ADB_LAPSE_RATE * evap_prob) + (DRY_ADB_LAPSE_RATE * (1.0 - evap_prob))) / 2.0;
+
+        let true_temp = self.get_partial_temp(absl_height, y_dis, avg_lapse_rate, x, y);
+        
+        let mut water_map = absl_height;
+        if water_map == 0.0 {
+            water_map = 1.0;
+        } else {
+            water_map = 0.0;
+            if true_temp > -20.0 && true_temp < 40.0 {
+
+                if absl_height < 2000.0 {
+                    water_map += evap_prob * (1.0 - (absl_height / 2000.0));
+                }
+
+                if water_map > 0.99 {
+                    water_map = 0.99;
+                }
+
+            }
+        }
+
+        let humidity = (0.90 * water_map) + (0.10 * self.humidity_noise.get_value(x, y));
+
+        // let mut percipitation_potential = 19.3 * true_temp + 193.0;
+        // if true_temp > 30.0 {
+        //     percipitation_potential = -70.0 * true_temp + 2872.0;
+        // }
+
+        let percipitation = 400.0 * humidity;
+
+        (percipitation, true_temp)
+    }
+
     fn get_tile(&self, x: f64, y: f64) -> Tile {
 
         let map_axis_len = self.tile_size * self.tile_scale * self.map_size as f64 / 2.0;
@@ -174,64 +241,15 @@ impl MapGen {
         let x = (x / self.zoom) + (map_axis_len * self.zoom * self.x_shift);
         let y = (y / self.zoom) + (map_axis_len * self.zoom * self.y_shift);
 
-        let y_dis = y.abs() / map_axis_len / self.zoom;
-        let x_dis = x.abs() / map_axis_len / self.zoom;
+        let y_dis = y / map_axis_len / self.zoom;
+        let x_dis = x / map_axis_len / self.zoom;
         let r_dis = ((y_dis * y_dis) + (x_dis * x_dis)).sqrt() / (2.0_f64).sqrt();
 
-        let avg_globe_noise = self.height_noise.get_value(x, y) * (1.0 - (r_dis + 0.3 + 0.4 * self.height_noise.get_value(-x, -y)));
-        let height = 6000.0 * avg_globe_noise - 1000.0;
-        let mut abs_elevation = height;
-        if abs_elevation < 0.0 {
-            abs_elevation = 0.0;
-        }
+        let (height, absl_height) = self.get_heights(r_dis, x, y);
+        let partial_temp = self.get_partial_temp(absl_height, y_dis, DRY_ADB_LAPSE_RATE * 0.5, x, y);
+        let (percipitation, temperature) = self.get_percip_temp(absl_height, y_dis, partial_temp, x, y);
 
-        let temperature = 24.0 * (-y_dis) + 11.0 + 7.0 * self.temperature_noise.get_value(x, y) - (DRY_ADB_LAPSE_RATE * abs_elevation);
-
-        let mut mobility_clamp = temperature;
-        if mobility_clamp < 0.0 {
-            mobility_clamp = 0.0;
-        }
-        if mobility_clamp > 20.0 {
-            mobility_clamp = 0.0;
-        }
-
-        let mut water_mobility = 1.0 - ((mobility_clamp - 10.0) / 10.0).abs();
-        if water_mobility < 0.0 {
-            water_mobility = 0.0;
-        }
-
-        let avg_lapse_rate = ((WET_ADB_LAPSE_RATE * water_mobility) + (DRY_ADB_LAPSE_RATE * (1.0 - water_mobility))) / 2.0;
-
-        let temperature = 24.0 * (-y_dis) + 11.0 + 7.0 * self.temperature_noise.get_value(x, y) - (avg_lapse_rate * abs_elevation);
-        
-        let mut water_map = abs_elevation;
-        if water_map == 0.0 {
-            water_map = 1.0;
-        } else {
-            water_map = 0.0;
-            if temperature > 0.0 && temperature < 20.0 {
-
-                if abs_elevation < 3500.0 {
-                    water_map += water_mobility * (1.0 - (abs_elevation / 3500.0));
-                }
-
-                if water_map > 0.95 {
-                    water_map = 0.95;
-                }
-
-            }
-        }
-
-        let humidity = (0.75 * water_map) + (0.25 * self.humidity_noise.get_value(x, y));
-
-        let mut percipitation_potential = 19.3 * temperature + 193.0;
-        if temperature > 30.0 {
-            percipitation_potential = -70.0 * temperature + 2872.0;
-        }
-
-        let percipitation = percipitation_potential * humidity;
-
-        let height_clamp = avg_globe_noise as f32;
+        let height_clamp = height as f32 / 6000.0;
         let temp_clamp = (temperature as f32 + 33.0) / 88.0;
         let humidity_clamp = percipitation as f32 / 750.0;
 
@@ -241,7 +259,7 @@ impl MapGen {
 
         let mix_color  = Color::rgb(height_clamp, temp_clamp, humidity_clamp);
 
-        let biome: Biome = self.pick_biome(abs_elevation, temperature, percipitation);
+        let biome: Biome = self.pick_biome(height, temperature, percipitation);
         //let biome = Biome::BorealForest;
 
         // Rainforest,
@@ -256,7 +274,7 @@ impl MapGen {
 
         // Tile {
         //     index: 0,
-        //     color: height_color,
+        //     color: humidity_color,
         // }
 
     }
@@ -377,7 +395,6 @@ fn spawn_map(
     let tile_scale = 0.25;
     let map_size = 250;
 
-    //829201 rng.gen_range(0..99999)
     let mapgen = MapGen::new(seed.0, zoom.0, x_shift.0, y_shift.0, map_size, tile_size, tile_scale);
 
     let texture_handle = asset_server.load("textures/tilemap.png");
