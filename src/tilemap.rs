@@ -1,4 +1,6 @@
 use bevy::prelude::*;
+use std::ops::Add;
+use std::ops::Mul;
 use noise::{NoiseFn, Perlin};
 use rand::{thread_rng, Rng};
 
@@ -21,14 +23,9 @@ const DRY_ADB_LAPSE_RATE: f64 = 9.8/1000.0;
 const WET_ADB_LAPSE_RATE: f64 = 5.0/1000.0;
 
 // Grass biome colors
-const BOREAL_FOREST_COLOR: Color       = Color::rgb(26.0/255.0, 101.0/255.0, 49.0/255.0);
-const GRASSLAND_COLOR: Color           = Color::rgb(157.0/255.0, 183.0/255.0, 92.0/255.0);
-const RAINFOREST_COLOR: Color          = Color::rgb(0.0/255.0, 101.0/255.0, 14.0/255.0);
-const FOREST_COLOR: Color              = Color::rgb(56.0/255.0, 115.0/255.0, 41.0/255.0);
-const WOODLAND_COLOR: Color            = Color::rgb(97.0/255.0, 119.0/255.0, 44.0/255.0);
-const TROPICAL_RAINFOREST_COLOR: Color = Color::rgb(0.0/255.0, 133.0/255.0, 19.0/255.0);
-const SAVANNA_COLOR: Color             = Color::rgb(154.0/255.0, 180.0/255.0, 54.0/255.0);
-const DEAD_COLOR: Color                = Color::rgb(140.0/255.0, 126.0/255.0, 78.0/255.0);
+const YELLOW_COLOR: Color = Color::rgb(240.0/255.0, 240.0/255.0, 127.0/255.0);
+const BLUE_COLOR: Color   = Color::rgb(0.0/255.0, 255.0/255.0, 213.0/255.0);
+const GREEN_COLOR: Color  = Color::rgb(0.0/255.0, 255.0/255.0, 17.0/255.0);
 
 struct MapGen {
     map_size: u32,
@@ -52,15 +49,43 @@ struct NoiseMap {
 
 enum Biome {
     Ocean,
-    Tundra,
-    BorealForest,
-    Grassland,
-    Rainforest,
-    Forest,
-    Woodland,
-    TropicalRainforest,
-    Savanna,
-    Desert
+    
+    PolarDesert,
+
+    SubpolarDryTundra,
+    SubpolarMoistTundra,
+    SubpolarWetTundra,
+    SubpolarRainTundra,
+    
+    BorealDesert,
+    BorealDryScrub,
+    BorealMoistForest,
+    BorealWetForest,
+    BorealRainForest,
+
+    TemperateDesert,
+    TemperateDesertScrub,
+    TemperateSteppe,
+    TemperateMoistForest,
+    TemperateWetForest,
+    TemperateRainForest,
+
+    SubtropicalDesert,
+    SubtropicalDesertScrub,
+    SubtropicalThornWoodland,
+    SubtropicalDryForest,
+    SubtropicalMoistForest,
+    SubtropicalWetForest,
+    SubtropicalRainForest,
+    
+    TropicalDesert,
+    TropicalDesertScrub,
+    TropicalThornWoodland,
+    TropicalVeryDryForest,
+    TropicalDryForest,
+    TropicalMoistForest,
+    TropicalWetForest,
+    TropicalRainForest,
 }
 
 struct Tile {
@@ -126,50 +151,128 @@ impl MapGen {
             return Biome::Ocean;
         }
 
-        if temperature < 0.0 {
-            return Biome::Tundra;
-        } else if temperature < 10.0 && temperature >= 0.0 && percipitation >= 25.0 {
-            return Biome::BorealForest;
-        } else if temperature < 20.0 && temperature >= 0.0 && percipitation < 25.0 {
-            return Biome::Grassland;
-        } else if temperature < 20.0 && temperature >= 10.0 {
-            if percipitation >= 25.0 && percipitation < 100.0 {
-                return Biome::Woodland;
-            } else if percipitation >= 100.0 && percipitation < 200.0 {
-                return Biome::Forest;
+        if temperature <= 0.0 { // polar
+           return Biome::PolarDesert;
+        } else if temperature > 0.0 && temperature <= 3.0 { // subpolar
+            if percipitation <= 125.0 {
+                return Biome::SubpolarDryTundra;
+            } else if percipitation > 125.0 && percipitation <= 250.0 {
+                return Biome::SubpolarMoistTundra;
+            } else if percipitation > 250.0 && percipitation <= 500.0 {
+                return Biome::SubpolarWetTundra;
             } else {
-                return Biome::Rainforest;
+                return Biome::SubpolarRainTundra;
             }
-        } else if temperature < 20.0 {
-            if percipitation >= 100.0 && percipitation < 250.0 {
-                return Biome::Savanna;
+        } else if temperature > 3.0 && temperature <= 6.0 { // boreal
+            if percipitation <= 125.0 {
+                return Biome::BorealDesert;
+            } else if percipitation > 125.0 && percipitation <= 250.0 {
+                return Biome::BorealDryScrub;
+            } else if percipitation > 250.0 && percipitation <= 500.0 {
+                return Biome::BorealMoistForest;
+            } else if percipitation > 500.0 && percipitation <= 1000.0 {
+                return Biome::BorealWetForest;
             } else {
-                return Biome::TropicalRainforest;
+                return Biome::BorealRainForest;
             }
-        } else {
-            return Biome::Desert;
+        } else if temperature > 6.0 && temperature <= 12.0 { // temperate
+            if percipitation <= 125.0 {
+                return Biome::TemperateDesert;
+            } else if percipitation > 125.0 && percipitation <= 250.0 {
+                return Biome::TemperateDesertScrub;
+            } else if percipitation > 250.0 && percipitation <= 500.0 {
+                return Biome::TemperateSteppe;
+            } else if percipitation > 500.0 && percipitation <= 1000.0 {
+                return Biome::TemperateMoistForest;
+            } else if percipitation > 1000.0 && percipitation <= 2000.0 {
+                return Biome::TemperateWetForest;
+            } else {
+                return Biome::TemperateRainForest;
+            }
+        } else if temperature > 12.0 && temperature <= 24.0 { // subtropical
+            if percipitation <= 125.0 {
+                return Biome::SubtropicalDesert;
+            } else if percipitation > 125.0 && percipitation <= 250.0 {
+                return Biome::SubtropicalDesertScrub;
+            } else if percipitation > 250.0 && percipitation <= 500.0 {
+                return Biome::SubtropicalThornWoodland;
+            } else if percipitation > 500.0 && percipitation <= 1000.0 {
+                return Biome::SubtropicalDryForest;
+            } else if percipitation > 1000.0 && percipitation <= 2000.0 {
+                return Biome::SubtropicalMoistForest;
+            } else if percipitation > 2000.0 && percipitation <= 4000.0 {
+                return Biome::SubtropicalWetForest;
+            } else {
+                return Biome::SubtropicalRainForest;
+            }
+        } else { // tropical
+            if percipitation <= 125.0 {
+                return Biome::TropicalDesert;
+            } else if percipitation > 125.0 && percipitation <= 250.0 {
+                return Biome::TropicalDesertScrub;
+            } else if percipitation > 250.0 && percipitation <= 500.0 {
+                return Biome::TropicalThornWoodland;
+            } else if percipitation > 500.0 && percipitation <= 1000.0 {
+                return Biome::TropicalVeryDryForest;
+            } else if percipitation > 1000.0 && percipitation <= 2000.0 {
+                return Biome::TropicalDryForest;
+            } else if percipitation > 2000.0 && percipitation <= 4000.0 {
+                return Biome::TropicalMoistForest;
+            } else if percipitation > 4000.0 && percipitation <= 8000.0 {
+                return Biome::TropicalWetForest;
+            } else {
+                return Biome::TropicalRainForest;
+            }
         }
 
     }
 
-    fn pick_tile(&self, biome: Biome) -> Tile {
+    fn pick_tile(&self, biome: Biome, temperature: f64, percipitation: f64) -> Tile {
         match biome {
-            Biome::Ocean => Biome::ocean_tile(),
-            Biome::Tundra => Biome::tundra_tile(),
-            Biome::BorealForest => Biome::boreal_forest_tile(),
-            Biome::Grassland => Biome::grassland_tile(),
-            Biome::Rainforest => Biome::rainforest_tile(),
-            Biome::Forest => Biome::forest_tile(),
-            Biome::Woodland => Biome::woodland_tile(),
-            Biome::TropicalRainforest => Biome::tropical_rainforest_tile(),
-            Biome::Savanna => Biome::savanna_tile(),
-            Biome::Desert => Biome::desert_tile(),
+            Biome::Ocean => Biome::ocean_tile(temperature, percipitation),
+
+            Biome::PolarDesert => Biome::polar_desert_tile(temperature, percipitation),
+
+            Biome::SubpolarDryTundra => Biome::subpolar_dry_tundra_tile(temperature, percipitation),
+            Biome::SubpolarMoistTundra => Biome::subpolar_moist_tundra_tile(temperature, percipitation),
+            Biome::SubpolarWetTundra => Biome::subpolar_wet_tundra_tile(temperature, percipitation),
+            Biome::SubpolarRainTundra => Biome::subpolar_rain_tundra_tile(temperature, percipitation),
+            
+            Biome::BorealDesert => Biome::boreal_desert_tile(temperature, percipitation),
+            Biome::BorealDryScrub => Biome::boreal_dry_scrub_tile(temperature, percipitation),
+            Biome::BorealMoistForest => Biome::boreal_moist_forest_tile(temperature, percipitation),
+            Biome::BorealWetForest => Biome::boreal_wet_forest_tile(temperature, percipitation),
+            Biome::BorealRainForest => Biome::boreal_rain_forest_tile(temperature, percipitation),
+        
+            Biome::TemperateDesert => Biome::temperate_desert_tile(temperature, percipitation),
+            Biome::TemperateDesertScrub => Biome::temperate_desert_scrub_tile(temperature, percipitation),
+            Biome::TemperateSteppe => Biome::temperate_steppe_tile(temperature, percipitation),
+            Biome::TemperateMoistForest => Biome::temperate_moist_forest_tile(temperature, percipitation),
+            Biome::TemperateWetForest => Biome::temperate_wet_forest_tile(temperature, percipitation),
+            Biome::TemperateRainForest => Biome::temperate_rain_forest_tile(temperature, percipitation),
+        
+            Biome::SubtropicalDesert => Biome::subtropical_desert_tile(temperature, percipitation),
+            Biome::SubtropicalDesertScrub => Biome::subtropical_desert_scrub_tile(temperature, percipitation),
+            Biome::SubtropicalThornWoodland => Biome::subtropical_thorn_woodland_tile(temperature, percipitation),
+            Biome::SubtropicalDryForest => Biome::subtropical_dry_forest_tile(temperature, percipitation),
+            Biome::SubtropicalMoistForest => Biome::subtropical_moist_forest_tile(temperature, percipitation),
+            Biome::SubtropicalWetForest => Biome::subtropical_wet_forest_tile(temperature, percipitation),
+            Biome::SubtropicalRainForest => Biome::subtropical_rain_forest_tile(temperature, percipitation),
+            
+            Biome::TropicalDesert => Biome::tropical_desert_tile(temperature, percipitation),
+            Biome::TropicalDesertScrub => Biome::tropical_desert_scrub_tile(temperature, percipitation),
+            Biome::TropicalThornWoodland => Biome::tropical_thorn_woodland_tile(temperature, percipitation),
+            Biome::TropicalVeryDryForest => Biome::tropical_very_dry_forest_tile(temperature, percipitation),
+            Biome::TropicalDryForest => Biome::tropical_dry_forest_tile(temperature, percipitation),
+            Biome::TropicalMoistForest => Biome::tropical_moist_forest_tile(temperature, percipitation),
+            Biome::TropicalWetForest => Biome::tropical_wet_forest_tile(temperature, percipitation),
+            Biome::TropicalRainForest => Biome::tropical_rain_forest_tile(temperature, percipitation),
         }
     }
 
     fn get_heights(&self, r_dis: f64, x: f64, y: f64) -> (f64, f64) {
         let globe_noise = self.height_noise.get_value(x, y) * (1.0 - (r_dis + 0.3 + 0.4 * self.height_noise.get_value(-x, -y)));
-        let height = 6000.0 * globe_noise - 1000.0;
+        let height = 9000.0 * globe_noise - 1000.0;
 
         let mut absl_height = height;
         if absl_height < 0.0 {
@@ -180,22 +283,25 @@ impl MapGen {
     }
 
     fn get_partial_temp(&self, absl_height: f64, y_dis: f64, lapse_rate: f64, x: f64, y: f64) -> f64 {
-        let noisy_temp = 20.0 * self.temperature_noise.get_value(x, y) - 5.0;
-        let temperature = -70.0 * y_dis + noisy_temp - (lapse_rate * absl_height);
+        let noisy_temp = 20.0 * self.temperature_noise.get_value(x, y) + 5.0;
+        let temperature = -40.0 * y_dis + noisy_temp - (lapse_rate * absl_height);
 
         temperature
     }
 
     fn get_percip_temp(&self, absl_height: f64, y_dis: f64, partial_temp: f64, x: f64, y: f64) -> (f64, f64) {
+        
+        let water_dist = 1.0 - (5.5 * y_dis.abs());
+        
         let mut temp_clamp = partial_temp;
         if temp_clamp < 0.0 {
             temp_clamp = 0.0;
         }
-        if temp_clamp > 20.0 {
+        if temp_clamp > 40.0 {
             temp_clamp = 0.0;
         }
 
-        let mut evap_prob = 1.0 - ((temp_clamp - 10.0) / 10.0).abs();
+        let mut evap_prob = 1.0 - ((temp_clamp - 20.0) / 20.0).abs();
         if evap_prob < 0.0 {
             evap_prob = 0.0;
         }
@@ -209,27 +315,25 @@ impl MapGen {
             water_map = 1.0;
         } else {
             water_map = 0.0;
-            if true_temp > -20.0 && true_temp < 40.0 {
 
-                if absl_height < 2000.0 {
-                    water_map += evap_prob * (1.0 - (absl_height / 2000.0));
+            if true_temp > 25.0 && true_temp < 35.0 {
+                if absl_height < 3500.0 {
+                    water_map +=  (1.0 - (absl_height / 3500.0));
                 }
-
+    
                 if water_map > 0.99 {
                     water_map = 0.99;
                 }
-
             }
         }
 
-        let humidity = (0.90 * water_map) + (0.10 * self.humidity_noise.get_value(x, y));
+        let humidity = (0.40 * water_map) + (0.30 * water_dist) + (0.30 * self.humidity_noise.get_value(x, y));
 
-        // let mut percipitation_potential = 19.3 * true_temp + 193.0;
-        // if true_temp > 30.0 {
-        //     percipitation_potential = -70.0 * true_temp + 2872.0;
-        // }
-
-        let percipitation = 400.0 * humidity;
+        let mut percipitation = 16000.0 * humidity;
+        let percipitation_cap = 500.0 * true_temp - 80.0;
+        if percipitation > percipitation_cap {
+            percipitation = percipitation_cap;
+        }
 
         (percipitation, true_temp)
     }
@@ -251,24 +355,17 @@ impl MapGen {
 
         let height_clamp = height as f32 / 6000.0;
         let temp_clamp = (temperature as f32 + 33.0) / 88.0;
-        let humidity_clamp = percipitation as f32 / 750.0;
+        let mut humidity_clamp = percipitation as f32;
 
         let height_color = Color::rgb(height_clamp, height_clamp, height_clamp);
         let temperature_color = Color::rgb(temp_clamp, temp_clamp, temp_clamp);
         let humidity_color = Color::rgb(humidity_clamp, humidity_clamp, humidity_clamp);
 
-        let mix_color  = Color::rgb(height_clamp, temp_clamp, humidity_clamp);
+        let mix_color  = Color::rgb(1.0 * temp_clamp, 1.0 * height_clamp, 0.0 * humidity_clamp);
 
         let biome: Biome = self.pick_biome(height, temperature, percipitation);
-        //let biome = Biome::BorealForest;
 
-        // Rainforest,
-        // Forest,
-        // Woodland,
-        // TropicalRainforest,
-        // Savanna,
-
-        let tile = self.pick_tile(biome);
+        let tile = self.pick_tile(biome, temperature, percipitation);
 
         tile
 
@@ -310,75 +407,265 @@ impl NoiseMap {
 }
 
 impl Biome {
-    fn ocean_tile() -> Tile {
+
+    fn calculate_grass_color(temperature: f64, percipitation: f64) -> Color {
+
+        let percip_p = (percipitation + 10000.0) / 10000.0;
+        let temp_p = temperature / 30.0;
+
+        let mut deadness = ((1.0 - percip_p) + temp_p) / 2.0;
+        if deadness < 0.0 {
+            deadness = 0.0;
+        }
+
+        let mut alpine_p = 0.6 * (1.0 - temp_p) + 0.4 * (deadness);
+        if alpine_p < 0.0 {
+            alpine_p = 0.0;
+        }
+        
+        let green_color = GREEN_COLOR.mul(deadness as f32);
+        let yellow_color = YELLOW_COLOR.mul(percip_p as f32);
+        let blue_color = BLUE_COLOR.mul(alpine_p as f32);
+
+        let grass_color = green_color.add(yellow_color).mul(0.5);
+        
+        grass_color
+    }
+
+    fn ocean_tile(temperature: f64, percipitation: f64) -> Tile {
         Tile {
             index: 3,
             color: Color::rgb(0.0, 0.2, 0.8),
         }
     }
 
-    fn tundra_tile() -> Tile {
+    fn polar_desert_tile(temperature: f64, percipitation: f64) -> Tile {
         Tile {
             index: 3,
             color: Color::rgb(1.0, 1.0, 1.0),
         }
     }
 
-    fn boreal_forest_tile() -> Tile {
+    // Subpolar ------------------
+
+    fn subpolar_dry_tundra_tile(temperature: f64, percipitation: f64) -> Tile {
         Tile {
-            index: 0,
-            color: BOREAL_FOREST_COLOR,
+            index: 4,
+            color: Color::rgb(1.0, 1.0, 1.0),
         }
     }
 
-    fn grassland_tile() -> Tile {
+    fn subpolar_moist_tundra_tile(temperature: f64, percipitation: f64) -> Tile {
         Tile {
             index: 0,
-            color: GRASSLAND_COLOR,
+            color: Biome::calculate_grass_color(temperature, percipitation),
         }
     }
 
-    fn rainforest_tile() -> Tile {
+    fn subpolar_wet_tundra_tile(temperature: f64, percipitation: f64) -> Tile {
         Tile {
             index: 0,
-            color: RAINFOREST_COLOR,
+            color: Biome::calculate_grass_color(temperature, percipitation),
         }
     }
 
-    fn forest_tile() -> Tile {
+    fn subpolar_rain_tundra_tile(temperature: f64, percipitation: f64) -> Tile {
         Tile {
             index: 0,
-            color: FOREST_COLOR,
+            color: Biome::calculate_grass_color(temperature, percipitation),
         }
     }
 
-    fn woodland_tile() -> Tile {
+    // Boreal ------------------
+
+    fn boreal_desert_tile(temperature: f64, percipitation: f64) -> Tile {
         Tile {
             index: 0,
-            color: WOODLAND_COLOR,
+            color: Biome::calculate_grass_color(temperature, percipitation),
         }
     }
 
-    fn tropical_rainforest_tile() -> Tile {
+    fn boreal_dry_scrub_tile(temperature: f64, percipitation: f64) -> Tile {
         Tile {
             index: 0,
-            color: TROPICAL_RAINFOREST_COLOR,
+            color: Biome::calculate_grass_color(temperature, percipitation),
         }
     }
 
-    fn savanna_tile() -> Tile {
+    fn boreal_moist_forest_tile(temperature: f64, percipitation: f64) -> Tile {
         Tile {
             index: 0,
-            color: SAVANNA_COLOR,
+            color: Biome::calculate_grass_color(temperature, percipitation),
         }
     }
 
-    fn desert_tile() -> Tile {
+    fn boreal_wet_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn boreal_rain_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    // Temperate ------------------
+
+    fn temperate_desert_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn temperate_desert_scrub_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn temperate_steppe_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn temperate_moist_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn temperate_wet_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn temperate_rain_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    // Subtropical ------------------
+
+    fn subtropical_desert_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn subtropical_desert_scrub_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+    
+    fn subtropical_thorn_woodland_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn subtropical_dry_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn subtropical_moist_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn subtropical_wet_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn subtropical_rain_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+     // Tropical ------------------
+
+    fn tropical_desert_tile(temperature: f64, percipitation: f64) -> Tile {
         Tile {
             index: 2,
             color: Color::rgb(1.0, 1.0, 1.0),
         }
     }
+
+    fn tropical_desert_scrub_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 1,
+            color: Color::rgb(1.0, 1.0, 1.0),
+        }
+    }
+
+    fn tropical_thorn_woodland_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn tropical_very_dry_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn tropical_dry_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn tropical_moist_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn tropical_wet_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
+    fn tropical_rain_forest_tile(temperature: f64, percipitation: f64) -> Tile {
+        Tile {
+            index: 0,
+            color: Biome::calculate_grass_color(temperature, percipitation),
+        }
+    }
+
 }
 
 fn spawn_map(
